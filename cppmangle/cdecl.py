@@ -1,5 +1,6 @@
 from .ast import *
 
+_ptr64 = '__ptr64 '
 _cvs = ('', 'const ', 'volatile ', 'const volatile ')
 _class_kinds = ('union', 'struct', 'class', 'enum')
 
@@ -14,18 +15,22 @@ def _cdecl_name(name, prev):
     if name == n_destructor:
         return '~{}'.format(prev), None
     if isinstance(name, SpecialName):
-        return name.desc, None
+        return str(name), None
     if isinstance(name, TemplateId):
         return '{}<{}>'.format(name.name, ','.join(_cdecl_templ_arg(arg) for arg in name.args)), name.name
     return name, name
 
 def cdecl_qname(qname):
+    prefix = ''
     names = []
     base_name = None
     for name in qname:
         full_name, base_name = _cdecl_name(name, base_name)
+        if isinstance(name, RTTITypeDescriptorName):
+            if name.type is not None:
+                prefix += cdecl_type(name.type) + ' '
         names.append(full_name)
-    return '::'.join(names)
+    return prefix + '::'.join(names)
 
 def cdecl_type(type, obj_name=''):
     prefixes = []
@@ -40,17 +45,18 @@ def cdecl_type(type, obj_name=''):
             if type.basic_type == t_none:
                 break
 
-            prefixes.append(_cvs[type.cv])
             prefixes.append(' ')
             prefixes.append(type.basic_type.desc)
+            prefixes.append(_cvs[type.cv])
             break
 
         if isinstance(type, ClassType):
-            prefixes.append(_cvs[type.cv])
             prefixes.append(' ')
             prefixes.append(cdecl_qname(type.qname))
             prefixes.append(' ')
             prefixes.append(_class_kinds[type.kind])
+            prefixes.append(' ')
+            prefixes.append(_cvs[type.cv].strip())
             break
 
         if isinstance(type, ArrayType):
@@ -67,9 +73,12 @@ def cdecl_type(type, obj_name=''):
             prio = 2
             if type.ref:
                 prefixes.append('& ')
-            else:
                 prefixes.append(_cvs[type.cv])
+            else:
                 prefixes.append('* ')
+                if type.addr_space == as_msvc_x64_absolute:
+                    prefixes.append(_ptr64)
+                prefixes.append(_cvs[type.cv])
             type = type.target
             continue
 
@@ -85,23 +94,41 @@ def cdecl_type(type, obj_name=''):
             suffixes.append(','.join(cdecl_type(param) for param in type.params))
             suffixes.append(')')
             if type.this_cv is not None:
-                suffixes.append(_cvs[type.this_cv])
+                suffixes.append(' ')
+                suffixes.append(_cvs[type.this_cv].strip())
             type = type.ret_type
             continue
 
-        raise RuntimeError('unk')
+        raise RuntimeError('cdecl_type(): unknown type')
 
     return ''.join(reversed(prefixes)).strip() + ''.join(suffixes)
 
 def cdecl_sym(sym):
     if isinstance(sym, Function):
         r = []
-        if sym.access_spec is not None:
-            r.extend((sym.access_spec.desc, ': '))
+        access_spec = sym.get_access_spec()
+        if access_spec is not None:
+            r.extend((access_spec.desc, ': '))
         if sym.kind == fn_virtual:
             r.append('virtual ')
         if sym.kind == fn_class_static:
             r.append('static ')
         r.append(cdecl_type(sym.type, cdecl_qname(sym.qname)))
         return ''.join(r)
+    elif isinstance(sym, Variable):
+        r = []
+        access_spec = sym.get_access_spec()
+        if access_spec is not None:
+            r.extend((access_spec.desc, ': '))
+
+        if sym.storage_class >= '0' and sym.storage_class <= '7':
+            if sym.cv is not None:
+                r.append(_cvs[sym.cv])
+            
+            if sym.ret_type is not None:
+                r.append(cdecl_type(sym.ret_type) + ' ')
+
+        r.append(cdecl_qname(sym.qname))
+        return ''.join(r)
+
     raise RuntimeError('unk')

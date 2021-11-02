@@ -47,56 +47,97 @@ _class_kind_map_inv = _transpose(_class_kind_map)
 
 _special_names_map = {
     '0': n_constructor,
-    '_F': n_def_constr_closure,
     '1': n_destructor,
-    'A': n_op_subscript,
-    'R': n_op_call,
-    'C': n_op_member,
-    'E': n_op_inc,
-    'F': n_op_dec,
     '2': n_op_new,
-    '_U': n_op_new_arr,
     '3': n_op_delete,
-    '_V': n_op_delete_arr,
-    'D': n_op_deref,
-    '7': n_op_lnot,
-    'S': n_op_bnot,
-    'J': n_op_mem_ptr,
-    'D': n_op_mul,
-    'K': n_op_div,
-    'L': n_op_mod,
-    'H': n_op_add,
-    'G': n_op_sub,
-    '6': n_op_shl,
+    '4': n_op_assign,
     '5': n_op_shr,
-    'M': n_op_lt,
-    'O': n_op_gt,
-    'N': n_op_le,
-    'P': n_op_ge,
+    '6': n_op_shl,
+    '7': n_op_lnot,
     '8': n_op_eq,
     '9': n_op_neq,
+    'A': n_op_subscript,
+    'B': n_op_cast,
+    'C': n_op_member,
+    'D': n_op_deref,
+    'D': n_op_mul,
+    'E': n_op_inc,
+    'F': n_op_dec,
+    'G': n_op_sub,
+    'H': n_op_add,
     'I': n_op_band,
-    'U': n_op_bor,
+    'J': n_op_mem_ptr,
+    'K': n_op_div,
+    'L': n_op_mod,
+    'M': n_op_lt,
+    'N': n_op_le,
+    'O': n_op_gt,
+    'P': n_op_ge,
+    'Q': n_op_comma,
+    'R': n_op_call,
+    'S': n_op_bnot,
     'T': n_op_xor,
+    'U': n_op_bor,
     'V': n_op_land,
     'W': n_op_lor,
-    '4': n_op_assign,
     'X': n_op_assign_mul,
-    '_0': n_op_assign_div,
-    '_1': n_op_assign_mod,
     'Y': n_op_assign_add,
     'Z': n_op_assign_sub,
-    '_3': n_op_assign_shl,
+    '_0': n_op_assign_div,
+    '_1': n_op_assign_mod,
     '_2': n_op_assign_shr,
+    '_3': n_op_assign_shl,
     '_4': n_op_assign_band,
     '_5': n_op_assign_bor,
     '_6': n_op_assign_xor,
-    'Q': n_op_comma,
-    'B': n_op_cast,
-    '_7': n_vtable,
+    '_7': n_vftable,
+    '_8': n_vbtable,
+    '_9': n_vcall,
+    '_A': n_typeof,
+    '_B': n_local_static_guard,
+    # '_C': None, # string constant
+    '_D': n_vbase_destructor,
+    '_E': n_vector_deleting_destructor,
+    '_F': n_def_constr_closure,
+    '_G': n_scalar_deleting_destructor,
+    '_H': n_vector_constructor_iterator,
+    '_I': n_vector_destructor_iterator,
+    '_J': n_vector_vbase_constructor_iterator,
+    '_K': n_virtual_displacement_map,
+    '_L': n_eh_vector_constructor_iterator,
+    '_M': n_eh_vector_destructor_iterator,
+    '_N': n_eh_vector_vbase_constructor_iterator,
+    '_O': n_copy_constructor_closure,
+    '_P': n_op_udt_returning,
+    # '_R': None, # RTTI
+    '_S': n_local_vftable,
+    '_T': n_local_vftable_constructor_closure,
+    '_U': n_op_new_arr,
+    '_V': n_op_delete_arr,
+    '_W': n_omni_callsig,
+    '_X': n_placement_delete_closure,
+    '_Y': n_placement_delete_arr_closure,
+    '__A': n_managed_vector_constructor_iterator,
+    '__B': n_managed_vector_destructor_iterator,
+    '__C': n_eh_vector_copy_constructor_iterator,
+    '__D': n_eh_vector_vbase_copy_constructor_iterator,
+    '__E': n_dynamic_initializer,
+    '__F': n_dynamic_atexit_destructor,
+    '__G': n_vector_copy_constructor_iterator,
+    '__H': n_vector_vbase_copy_constructor_iterator,
+    '__I': n_managed_vector_copy_constructor_iterator,
+    '__J': n_local_static_thread_guard,
+    '__K': n_op_udf_literal
     }
 
 _special_names_map_inv = _transpose(_special_names_map)
+_special_names_rtti_map = {
+    '0': n_rtti_type_descriptor,
+    '1': n_rtti_base_class_descriptor,
+    '2': n_rtti_base_class_arr,
+    '3': n_rtti_class_hierarchy_descriptor,
+    '4': n_rtti_complete_object_locator
+    }
 
 def _p_simple_name(p):
     nl = p.get('names')
@@ -105,13 +146,28 @@ def _p_simple_name(p):
         return nl[ref]
 
     with p:
-        special_name = p(r'\?_?[0-9A-Z]')[1:]
+        special_name = p(r'\?_{0,2}[0-9A-Z]')[1:]
+        if special_name == '_R':
+            return _p_rtti_name(p)
+
         return _special_names_map[special_name]
 
     n = p(r'[^@]+@')[:-1]
     if n not in nl:
         p.set_global('names', nl + (n,))
     return n
+
+def _p_rtti_name(p):
+    rtti_type = p('[0-4]')
+    ret = _special_names_rtti_map[rtti_type]
+
+    if isinstance(ret, RTTITypeDescriptorName):
+        type, _ = _p_type(p)
+        return RTTITypeDescriptorName(ret.desc, type)
+    elif isinstance(ret, RTTIBaseClassDescriptorName):
+        return RTTIBaseClassDescriptorName(ret.desc, _p_int(p), _p_int(p), _p_int(p),  _p_int(p))
+
+    return ret
 
 def _p_int(p):
     neg = bool(p.opt(r'\?'))
@@ -158,11 +214,19 @@ def _p_basic_type(p):
 _cvs = [0, cv_const, cv_volatile, cv_const | cv_volatile]
 
 def _p_type(p):
+    addr_space = as_default
+    target_cv = cv_none
+
+    # check for modified types
+    # this should really only be used situationally
+    if p(r'[\?]?'):
+        addr_space, target_cv = _p_get_modifier(p)
+
     with p:
         kind = p('T|U|V|W4')[0]
         kind = ord(kind) - ord('T')
         qname = p(_p_qname)
-        return ClassType(0, kind, qname), True
+        return ClassType(target_cv, kind, qname, addr_space), True
 
     with p:
         # arrays
@@ -176,15 +240,15 @@ def _p_type(p):
         # pointer to fn
         cv = _cvs[ord(p('[PQRS]6')[0]) - ord('P')]
         fn_type = p(_p_fn_type)
-        return PtrType(cv, fn_type, False, as_default), True
+        return PtrType(cv, fn_type, False, addr_space), True
 
     with p:
         # pointer types
         kind = p('[APQRS]')
-        addr_space = as_msvc_x64_absolute if p('E?') else as_default
-        target_cv = p('[A-D]')
+        addr_space, target_cv = _p_get_modifier(p)
+
         target, reg = p(_p_type)
-        target.cv = _cvs[ord(target_cv) - ord('A')]
+        target.cv = target_cv
 
         cv = _cvs[ord(kind) - ord('P')] if kind != 'A' else 0
         return PtrType(cv, target, kind == 'A', addr_space), True
@@ -230,14 +294,25 @@ def _p_root(p):
     p(r'\?')
     qname = p(_p_qname)
 
+    # consume class specifier if applicable
+    # TODO: handle me properly
+    p('@?')
+
     with p:
-        # non-member function
-        p('[YZ]')
+        return _p_root_function(p, qname)
+
+    with p:
+        return _p_root_variable(p, qname)
+
+    raise RuntimeError('Unknown symbol type')
+
+def _p_root_function(p, qname):
+    # non-member function
+    if p('[YZ]?'):
         access_class = None
         kind = fn_free
-
-    if not p:
-        # member function
+    # member function
+    else:
         modif = p('[A-V]')
         modif = ord(modif) - ord('A')
         access_class = (access_private, access_protected, access_public)[modif // 8]
@@ -249,11 +324,9 @@ def _p_root(p):
         else:
             kind = fn_instance
 
-
     can_have_cv = kind in (fn_instance, fn_virtual)
     if can_have_cv:
-        addr_space = as_msvc_x64_absolute if p('E?') else as_default
-        this_cv = ord(p('[A-D]')) - ord('A')
+        addr_space, this_cv = _p_get_modifier(p)
     else:
         addr_space = as_default
         this_cv = None
@@ -264,6 +337,28 @@ def _p_root(p):
     type.this_cv = this_cv
 
     return Function(qname, type, kind, access_class, addr_space)
+
+def _p_root_variable(p, qname):
+    ret = Variable(qname)
+    ret.storage_class = p('[0-9]')
+
+    # >= sc_private_static_member <= sc_static_local
+    if ret.storage_class >= '0' and ret.storage_class <= '5':
+        ret.ret_type, _ = p(_p_type)
+        ret.addr_space, ret.cv = _p_get_modifier(p)
+    elif ret.storage_class == sc_vftable or ret.storage_class == sc_vbtable:
+        ret.addr_space, ret.cv = _p_get_modifier(p)
+        is_structor = True if p(r'[@]?') else False
+        if not is_structor:
+            ret.ret_type, _ = p(_p_type)
+
+    p(p.eof)
+    return ret
+
+def _p_get_modifier(p):
+    addr_space = as_msvc_x64_absolute if p('E?') else as_default
+    cv = ord(p('[A-D]')) - ord('A')
+    return addr_space, cv
 
 def msvc_demangle(s):
     return speg.peg(s, _p_root)
@@ -301,7 +396,20 @@ def _m_qname(qname, nl):
             r.append(str(pos))
             continue
 
-        if isinstance(name, SpecialName):
+        if isinstance(name, RTTIBaseClassDescriptorName):
+            r.append('?_R{}{}{}{}{}'.format(
+                name.rtti_type,
+                _m_int(name.member_displacement),
+                _m_int(name.vftable_displacement),
+                _m_int(name.displacement_within_vftable),
+                _m_int(name.attributes)))
+        elif isinstance(name, RTTITypeDescriptorName):
+            r.append('?_R{}{}'.format(
+                name.rtti_type,
+                _m_type(name.type, nl, {})))
+        elif isinstance(name, RTTIName):
+            r.append('?_R{}'.format(name.rtti_type))
+        elif isinstance(name, SpecialName):
             r.append('?{}'.format(_special_names_map_inv[name]))
         elif isinstance(name, TemplateId):
             r.append('?${}@{}@'.format(name.name, ''.join(_m_templ_arg(arg) for arg in name.args)))
@@ -311,6 +419,12 @@ def _m_qname(qname, nl):
                 nl[name] = len(nl)
 
     return '{}@'.format(''.join(r))
+
+def _m_addr_space(addr_space):
+    return 'E' if addr_space == as_msvc_x64_absolute else ''
+
+def _m_cv(cv):
+    return 'ABCD'[cv]
 
 def _m_type(type, nl, tl):
     if isinstance(type, SimpleType):
@@ -323,12 +437,19 @@ def _m_type(type, nl, tl):
         if isinstance(type.target, FunctionType):
             return '{}6{}'.format(kind, _m_fn_type(type.target, nl, tl))
         else:
-            return '{}{}{}{}'.format(kind, 'E' if type.addr_space == as_msvc_x64_absolute else '', 'ABCD'[type.target.cv], _m_type(type.target, nl, tl))
+            return '{}{}{}{}'.format(kind, _m_addr_space(type.addr_space), _m_cv(type.target.cv), _m_type(type.target, nl, tl))
     if isinstance(type, ArrayType):
         return 'Y{}{}{}'.format(_m_int(len(type.dims)), ''.join(_m_int(dim) for dim in type.dims), _m_type(type.target, nl, tl))
     if isinstance(type, ClassType):
         qname = _m_qname(type.qname, nl)
-        return '{}{}'.format(_class_kind_map_inv[type.kind], qname)
+
+        # check for modified types - there MUST be a way to do this better
+        # it feels like it should just be for ClassTypes but this doesn't appear to be the case
+        prefix = ''
+        if type.addr_space is not None:
+            prefix += '?{}{}'.format(_m_addr_space(type.addr_space), _m_cv(type.cv))
+
+        return '{}{}{}'.format(prefix, _class_kind_map_inv[type.kind], qname)
     raise RuntimeError('whoops')
 
 def _m_fn_type(type, nl, tl):
@@ -385,10 +506,31 @@ def msvc_mangle(obj):
 
             modif = chr(ord('A') + modif)
 
-        addr_space = 'E' if obj.addr_space == as_msvc_x64_absolute else ''
         can_have_cv = obj.kind in (fn_instance, fn_virtual)
-        this_cv = 'ABCD'[obj.type.this_cv] if can_have_cv else ''
+        addr_space = _m_addr_space(obj.addr_space) if can_have_cv else ''
+        this_cv = _m_cv(obj.type.this_cv) if can_have_cv else ''
 
         return '?{}{}{}{}{}'.format(qname, modif, addr_space, this_cv, type)
+
+    elif isinstance(obj, Variable):
+        qname = _m_qname(obj.qname, nl)
+        ret = '?{}{}'.format(qname, obj.storage_class)
+
+        ret_cv = ''
+        ret_type = '@'
+
+        if obj.cv is not None:
+            ret_cv = _m_addr_space(obj.addr_space)
+            ret_cv += _m_cv(obj.cv)
+
+        if obj.ret_type is not None:
+            ret_type = _m_type(obj.ret_type, nl, tl)
+
+        if obj.storage_class >= '0' and obj.storage_class <= '5':
+            ret += '{}{}'.format(ret_type, ret_cv)
+        elif obj.storage_class == sc_vftable or obj.storage_class == sc_vbtable:
+            ret += '{}{}'.format(ret_cv, ret_type)
+
+        return ret
 
     raise RuntimeError('unknown obj')
