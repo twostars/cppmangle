@@ -193,7 +193,6 @@ def _p_name(p):
             if p.opt(r'\$0'):
                 type_args.append(p(_p_int))
             else:
-                p.set('names', ())
                 arg, _ = p(_p_type)
                 type_args.append(arg)
         return TemplateId(name, type_args)
@@ -211,7 +210,7 @@ def _p_basic_type(p):
     c = p(r'[@XDCEFGHIJKMNOZ]|_[NJKW]')
     return SimpleType(0, _basic_type_map[c]), len(c) >= 2
 
-_cvs = [0, cv_const, cv_volatile, cv_const | cv_volatile]
+_cvs = [cv_none, cv_const, cv_volatile, cv_const | cv_volatile]
 
 def _p_type(p):
     addr_space = as_default
