@@ -3,20 +3,57 @@ class _Enum(object):
         self.desc = desc
 
     def __repr__(self):
-        return '{}({!r})'.format(self.__class__, self.desc)
+        return '{}({!r})'.format(__class__, self.__str__())
+
+    def __str__(self):
+        return self.desc
+
+    def __eq__(self, other):
+        if isinstance(other, _Enum):
+            return self.desc == other.desc
+
+        return False
+
+    def __hash__(self):
+        return self.desc.__hash__()
 
 class Type(object):
     def __init__(self, cv):
         self.cv = cv
 
+    def __repr__(self):
+        return '{}({!r})'.format(__class__, self.__str__())
+
+    def __str__(self):
+        raise NotImplementedError()
+
+    def __eq__(self, other):
+        if isinstance(other, Type):
+            return super().__eq__(other) and self.cv == other.cv
+
+        return False
+
 cv_none = 0
 cv_const = 1
 cv_volatile = 2
 
+ptr64_name = '__ptr64 '
+cv_names = ('', 'const ', 'volatile ', 'const volatile ')
+class_kind_names = ('union', 'struct', 'class', 'enum')
+
 class SimpleType(Type):
     def __init__(self, cv, basic_type):
+        super().__init__(cv)
         self.basic_type = basic_type
-        self.cv = cv
+
+    def __str__(self):
+        return '{}{}'.format(cv_names[self.cv], str(self.basic_type))
+
+    def __eq__(self, other):
+        if isinstance(other, SimpleType):
+            return self().__eq__(other) and self.basic_type == other.basic_type
+
+        return False
 
 class BasicType(_Enum):
     pass
@@ -43,10 +80,19 @@ t_ellipsis = BasicType('...')
 
 class PtrType(Type):
     def __init__(self, cv, target, ref, addr_space):
-        super(PtrType, self).__init__(cv)
+        super().__init__(cv)
         self.target = target
         self.ref = ref
         self.addr_space = addr_space
+
+    def __str__(self):
+        return '{}{}'.format(str(self.target), '&' if self.ref else '*')
+
+    def __eq__(self, other):
+        if isinstance(other, PtrType):
+            return super().__eq__(other) and self.target == other.target and self.ref == other.ref and self.addr_space == other.addr_space
+
+        return False
 
 k_union = 0
 k_struct = 1
@@ -62,29 +108,64 @@ class ClassType(Type):
         # hack for 'modified' types denoted by '?'
         self.addr_space = addr_space
 
+    def __str__(self):
+        return '{}{}'.format(cv_names[self.cv], '::'.join(map(str, self.qname)))
+
+    def __eq__(self, other):
+        if isinstance(other, ClassType):
+            return super().__eq__(other) and self.kind == other.kind and self.qname == other.qname and self.addr_space == other.addr_space
+
+        return False
+
 class FunctionType(Type):
     def __init__(self, cconv, ret_type, params, this_cv):
-        super(FunctionType, self).__init__(0)
+        super().__init__(cv_none)
         self.cconv = cconv
         self.ret_type = ret_type
         self.params = params
         self.this_cv = this_cv
 
+    def __str__(self):
+        return '{} __{}({}) {}'.format(
+            self.ret_type,
+            str(self.cconv),
+            ', '.join(map(str, self.params)),
+            cv_names[self.this_cv])
+
+    def __eq__(self, other):
+        if isinstance(other, FunctionType):
+            return super().__eq__(other) and self.cconv == other.cconv and self.ret_type == other.ret_type and self.params == other.params and self.this_cv == other.this_cv
+
+        return False
+
 class ArrayType(Type):
     def __init__(self, dims, target):
-        super(ArrayType, self).__init__(0)
+        super().__init__(cv_none)
         self.dims = dims
         self.target = target
 
+    def __eq__(self, other):
+        if isinstance(other, ArrayType):
+            return super().__eq__(other) and self.dims == other.dims and self.target == other.target
+
+        return False
+
 class Name(object):
-    pass
+    def __repr__(self):
+        return '{}({!r})'.format(__class__, self.__str__())
+
+    def __eq__(self, other):
+        return self.__str__() == other.__str__()
+
+    def __str__(self):
+        raise NotImplementedError()
+
+    def __hash__(self):
+        return self.__str__().__hash__()
 
 class SpecialName(Name):
     def __init__(self, desc):
         self.desc = desc
-
-    def __repr__(self):
-        return 'SpecialName({!r})'.format(self.desc)
 
     def __str__(self):
         return self.desc
@@ -93,9 +174,6 @@ class RTTIName(SpecialName):
     def __init__(self, desc, rtti_type):
         self.desc = desc
         self.rtti_type = rtti_type
-
-    def __repr__(self):
-        return 'RTTIName({!r})'.format(self.desc)
 
 class RTTITypeDescriptorName(RTTIName):
     def __init__(self, desc, type=None):
@@ -109,13 +187,6 @@ class RTTIBaseClassDescriptorName(RTTIName):
         self.vftable_displacement = vftable_displacement
         self.displacement_within_vftable = displacement_within_vftable
         self.attributes = attributes
-
-    def __retr__(self):
-        return super().__retr__.format(
-            self.member_displacement,
-            self.vftable_displacement,
-            self.displacement_within_vftable,
-            self.attributes)
 
     def __str__(self):
         return self.desc.format(
@@ -226,6 +297,9 @@ class TemplateId(Name):
     def __init__(self, name, args):
         self.name = name
         self.args = args
+
+    def __str__(self):
+        return '{}<{}>'.format(self.name, ', '.join(map(str, self.args)))
 
 class CallingConv(_Enum):
     pass

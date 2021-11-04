@@ -1,9 +1,5 @@
 from .ast import *
 
-_ptr64 = '__ptr64 '
-_cvs = ('', 'const ', 'volatile ', 'const volatile ')
-_class_kinds = ('union', 'struct', 'class', 'enum')
-
 def _cdecl_templ_arg(arg):
     if isinstance(arg, int):
         return str(arg)
@@ -47,16 +43,16 @@ def cdecl_type(type, obj_name=''):
 
             prefixes.append(' ')
             prefixes.append(type.basic_type.desc)
-            prefixes.append(_cvs[type.cv])
+            prefixes.append(cv_names[type.cv])
             break
 
         if isinstance(type, ClassType):
             prefixes.append(' ')
             prefixes.append(cdecl_qname(type.qname))
             prefixes.append(' ')
-            prefixes.append(_class_kinds[type.kind])
+            prefixes.append(class_kind_names[type.kind])
             prefixes.append(' ')
-            prefixes.append(_cvs[type.cv].strip())
+            prefixes.append(cv_names[type.cv].strip())
             break
 
         if isinstance(type, ArrayType):
@@ -73,12 +69,12 @@ def cdecl_type(type, obj_name=''):
             prio = 2
             if type.ref:
                 prefixes.append('& ')
-                prefixes.append(_cvs[type.cv])
+                prefixes.append(cv_names[type.cv])
             else:
                 prefixes.append('* ')
                 if type.addr_space == as_msvc_x64_absolute:
-                    prefixes.append(_ptr64)
-                prefixes.append(_cvs[type.cv])
+                    prefixes.append(ptr64_name)
+                prefixes.append(cv_names[type.cv])
             type = type.target
             continue
 
@@ -95,7 +91,7 @@ def cdecl_type(type, obj_name=''):
             suffixes.append(')')
             if type.this_cv is not None:
                 suffixes.append(' ')
-                suffixes.append(_cvs[type.this_cv].strip())
+                suffixes.append(cv_names[type.this_cv].strip())
             type = type.ret_type
             continue
 
@@ -123,7 +119,7 @@ def cdecl_sym(sym):
 
         if sym.storage_class >= '0' and sym.storage_class <= '7':
             if sym.cv is not None:
-                r.append(_cvs[sym.cv])
+                r.append(cv_names[sym.cv])
             
             if sym.ret_type is not None:
                 r.append(cdecl_type(sym.ret_type) + ' ')
