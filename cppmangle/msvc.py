@@ -139,7 +139,7 @@ _special_names_rtti_map = {
     '4': n_rtti_complete_object_locator
     }
 
-def _p_simple_name(p, store_backref=True):
+def _p_simple_name(p, store_backref):
     nl = p.get('names')
     with p:
         ref = int(p(r'\d'))
@@ -153,7 +153,7 @@ def _p_simple_name(p, store_backref=True):
         return _special_names_map[special_name]
 
     n = p(r'[^@]+@')[:-1]
-    if store_backref and n not in nl:
+    if store_backref:
         p.set_global('names', nl + (n,))
     return n
 
@@ -183,15 +183,18 @@ def _p_int(p):
 
     return -r if neg else r
 
-def _p_name(p, store_backref=True):
-    with p:
-        p(r'\?\$')
-
+def _p_name(p, store_backref):
+    if p.opt(r'\?\$'):
         # Parse the template name, e.g. 'name' from name<args>
         # We should ALWAYS store backrefs to this, as the args can be ref'd subsequently to it,
         # be it from within a function name, or a type.
         name = _p_simple_name(p, True)
+        
+        # get a copy of the names list for us to restore to after
+        # names loaded from the template should be scoped to this point
+        nl = p.get('names')
 
+        # parse the template arguments
         type_args = []
         while not p.opt('@'):
             if p.opt(r'\$0'):
@@ -199,6 +202,9 @@ def _p_name(p, store_backref=True):
             else:
                 arg, _ = p(_p_type)
                 type_args.append(arg)
+
+        # reset the names list back to the point of the template's name
+        p.set('names', nl)
         return TemplateId(name, type_args)
 
     return _p_simple_name(p, store_backref)
