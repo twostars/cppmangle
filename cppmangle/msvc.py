@@ -139,7 +139,7 @@ _special_names_rtti_map = {
     '4': n_rtti_complete_object_locator
     }
 
-def _p_simple_name(p, store_backref):
+def _p_simple_name(p):
     nl = p.get('names')
     with p:
         ref = int(p(r'\d'))
@@ -153,8 +153,7 @@ def _p_simple_name(p, store_backref):
         return _special_names_map[special_name]
 
     n = p(r'[^@]+@')[:-1]
-    if store_backref:
-        p.set_global('names', nl + (n,))
+    p.set_global('names', nl + (n,))
     return n
 
 def _p_rtti_name(p):
@@ -183,12 +182,10 @@ def _p_int(p):
 
     return -r if neg else r
 
-def _p_name(p, store_backref):
+def _p_name(p):
     if p.opt(r'\?\$'):
         # Parse the template name, e.g. 'name' from name<args>
-        # We should ALWAYS store backrefs to this, as the args can be ref'd subsequently to it,
-        # be it from within a function name, or a type.
-        name = _p_simple_name(p, True)
+        name = _p_simple_name(p)
         
         # get a copy of the names list for us to restore to after
         # names loaded from the template should be scoped to this point
@@ -207,16 +204,13 @@ def _p_name(p, store_backref):
         p.set('names', nl)
         return TemplateId(name, type_args)
 
-    return _p_simple_name(p, store_backref)
+    return _p_simple_name(p)
 
-def _p_qname(p, store_backref=True):
+def _p_qname(p):
     qname = []
     with p:
         while not p.opt('@'):
-            # first entry can be the symbol's name - this should be excluded, when set
-            # subsequent entries should be types, which should get backrefs
-            qname.append(_p_name(p, store_backref))
-            store_backref = True
+            qname.append(_p_name(p))
             p.commit()
     return tuple(qname[::-1])
 
@@ -240,7 +234,7 @@ def _p_type(p):
         kind = ord(kind) - ord('T')
 
         # we should always store backrefs to type names
-        qname = _p_qname(p, True)
+        qname = _p_qname(p)
         return ClassType(target_cv, kind, qname, addr_space), True
 
     with p:
@@ -307,12 +301,7 @@ def _p_root(p):
     p.set_global('param_types', ())
 
     p(r'\?')
-
-    # As a general rule, we shouldn't store a backref to the first entry
-    # of the name because that's usually the symbol's name.
-    # Backrefs should be stored to type names or template symbols,
-    # the latter of which will correctly override this setting.
-    qname = _p_qname(p, False)
+    qname = _p_qname(p)
 
     # consume class specifier if applicable
     # TODO: handle me properly
