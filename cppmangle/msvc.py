@@ -220,11 +220,12 @@ def _p_basic_type(p):
 
 _cvs = [cv_none, cv_const, cv_volatile, cv_const | cv_volatile]
 
-def _p_type(p):
+def _p_type(p, consume_break = True):
     addr_space = as_default
     target_cv = cv_none
 
-    p('@?')
+    if consume_break:
+        p('@?')
 
     # check for modified types
     # this should really only be used situationally
@@ -281,9 +282,10 @@ def _p_fn_type(p):
     cconv = _cc_map[p('[AEGI]')] #if qname[-1] not in _noncv_member_funcs else cconv_thiscall
 
     ret_cv = p(r'(\?[A-D])?')
-    ret, reg = p(_p_type)
+    ret, reg = p(_p_type, False)
     if ret_cv:
         ret.cv = ord(ret_cv[1]) - ord('A')
+
     params = []
 
     with p:
