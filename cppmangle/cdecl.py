@@ -67,14 +67,10 @@ def cdecl_type(type, obj_name=''):
 
         if isinstance(type, PtrType):
             prio = 2
-            if type.ref:
-                prefixes.append('& ')
-                prefixes.append(cv_names[type.cv])
-            else:
-                prefixes.append('* ')
-                if type.addr_space == as_msvc_x64_absolute:
-                    prefixes.append(ptr64_name)
-                prefixes.append(cv_names[type.cv])
+            prefixes.append(type.operator + ' ')
+            if type.addr_space == as_msvc_x64_absolute:
+                prefixes.append(ptr64_name)
+            prefixes.append(cv_names[type.cv])
             type = type.target
             continue
 

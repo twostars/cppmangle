@@ -224,6 +224,8 @@ def _p_type(p):
     addr_space = as_default
     target_cv = cv_none
 
+    p('@?')
+
     # check for modified types
     # this should really only be used situationally
     if p(r'[\?]?'):
@@ -249,18 +251,26 @@ def _p_type(p):
         # pointer to fn
         cv = _cvs[ord(p('[PQRS]6')[0]) - ord('P')]
         fn_type = p(_p_fn_type)
-        return PtrType(cv, fn_type, False, addr_space), True
+        return PtrType(cv, fn_type, '*', addr_space), True
 
     with p:
         # pointer types
-        kind = p('[APQRS]')
+        operator = None
+        cv = 0
+
+        if p.opt('\$\$Q'):
+            operator = '&&'
+        else:
+            kind = p('[APQRS]')
+            cv = _cvs[ord(kind) - ord('P')] if kind != 'A' else 0
+            operator = '&' if kind == 'A' else '*'
+
         addr_space, target_cv = _p_get_modifier(p)
 
         target, reg = p(_p_type)
         target.cv = target_cv
 
-        cv = _cvs[ord(kind) - ord('P')] if kind != 'A' else 0
-        return PtrType(cv, target, kind == 'A', addr_space), True
+        return PtrType(cv, target, operator, addr_space), True
 
     return p(_p_basic_type)
 
@@ -439,10 +449,14 @@ def _m_type(type, nl, tl):
     if isinstance(type, SimpleType):
         return _basic_type_map_inv[type.basic_type]
     if isinstance(type, PtrType):
-        if type.ref:
+        kind = ''
+        if type.operator == '&&':
+            kind = '$$Q'
+        elif type.operator == '&':
             kind = 'A'
         else:
             kind = 'PQRS'[type.cv]
+
         if isinstance(type.target, FunctionType):
             return '{}6{}'.format(kind, _m_fn_type(type.target, nl, tl))
         else:

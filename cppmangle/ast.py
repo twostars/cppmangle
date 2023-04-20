@@ -79,18 +79,18 @@ t_longdouble = BasicType('long double')
 t_ellipsis = BasicType('...')
 
 class PtrType(Type):
-    def __init__(self, cv, target, ref, addr_space):
+    def __init__(self, cv, target, operator, addr_space):
         super().__init__(cv)
         self.target = target
-        self.ref = ref
+        self.operator = operator
         self.addr_space = addr_space
 
     def __str__(self):
-        return '{}{}'.format(str(self.target), '&' if self.ref else '*')
+        return '{}{}'.format(str(self.target), self.operator)
 
     def __eq__(self, other):
         if isinstance(other, PtrType):
-            return super().__eq__(other) and self.target == other.target and self.ref == other.ref and self.addr_space == other.addr_space
+            return super().__eq__(other) and self.target == other.target and self.operator == other.operator and self.addr_space == other.addr_space
 
         return False
 
